@@ -50,56 +50,76 @@ When you start Label Studio using Docker Compose, you start it using a PostgreSQ
 docker-compose up -d
 ```
 
-## Minio Blob Storage
-MinIO is a blob storage solution that is compatible with Amazon S3. You can use MinIO to store your labeling tasks.
+## RustFS blob storage
+RustFS is an Apache-2.0 object store compatible with Amazon S3. Use it locally to store labeling tasks and to emulate an S3-based production setup.
 
 ### Starting the containers
-For local development, you can host a local MinIO server to emulate an S3-based production environment more closely. 
-An example docker-compose file for this is available in the [Label Studio repository](https://github.com/HumanSignal/label-studio).
+An example Docker Compose overlay is in this repository (`docker-compose.rustfs.yml`).
 
-To run MinIO alongside your Label Studio instance, use the following command:
-````bash
+To run RustFS alongside Label Studio:
+
+```bash
 # Add sudo on Linux if you are not a member of the docker group
-docker compose -f docker-compose.yml -f docker-compose.minio.yml up -d
-````
-The MinIO server will be accessible at http://localhost:9000. 
-To configure MinIO settings, create a `.env` file. Remember to override the default credentials.
-
-````.dotenv
-MINIO_ROOT_USER=minio_admin_do_not_use_in_production
-MINIO_ROOT_PASSWORD=minio_admin_do_not_use_in_production
-
-# To automatically select the right compose file for minio you can add on of the following lines:
-# Windows
-COMPOSE_FILE=docker-compose.yml;docker-compose.minio.yml
-# Linux/Mac
-COMPOSE_FILE=docker-compose.yml:docker-compose.minio.yml
-
-# To use a specific minio version you can set the following env var
-# MINIO_VERSION=RELEASE.2025-04-22T22-12-26Z
-````
-
-### Connect Label Studio to local MinIO
-
-If you do not have a static IP address, create an entry in your hosts file so that both the Label Studio container and 
-your browser can find MinIO at the same hostname.
-
-The following entry redirects all requests to MinIO to your local system:
-```text
-127.0.0.1 minio
+docker compose -f docker-compose.yml -f docker-compose.rustfs.yml up -d
 ```
 
-On Windows, you can find your hosts file at `C:\Windows\System32\drivers\etc\hosts`.
-On Linux, you can find your hosts file at `/etc/hosts`.
-On macOS, you can find your hosts file at `/private/etc/hosts`.
+Do not start this together with `docker-compose.minio.yml` — both bind port 9000.
 
-After modifying your hosts file, you can connect to your MinIO server with your browser at http://minio:9000.
+The S3 API is at http://localhost:9000. The console is at http://localhost:9001.
 
-### Remove MinIO data
-You can remove your MinIO installation by removing the containers and the associated volumes. 
-This operation is destructive and will remove all data stored in MinIO.
+Default credentials (override in a `.env` file):
+
+```dotenv
+RUSTFS_ACCESS_KEY=labelstudio
+RUSTFS_SECRET_KEY=labelstudio
+
+# Windows
+# COMPOSE_FILE=docker-compose.yml;docker-compose.rustfs.yml
+# Linux/Mac
+# COMPOSE_FILE=docker-compose.yml:docker-compose.rustfs.yml
+
+# RUSTFS_VERSION=latest
+```
+
+Create a bucket named `labelstudio` in the console (or with any S3 client) before connecting Label Studio.
+
+When you run Label Studio on the host (`make run-dev`), start only RustFS:
+
 ```bash
-docker-compose -f docker-compose.minio.yml down --volumes
+docker compose -f docker-compose.rustfs.yml up -d
+```
+
+### Connect Label Studio to local RustFS
+
+If Label Studio runs in Docker, add this hosts entry so the container and your browser share the same hostname. This is required for pre-signed URLs:
+
+```text
+127.0.0.1 rustfs
+```
+
+On Windows: `C:\Windows\System32\drivers\etc\hosts`.
+On Linux: `/etc/hosts`.
+On macOS: `/private/etc/hosts`.
+
+Then in Label Studio go to **Settings → Cloud Storage → Amazon S3**:
+
+| Field | Docker Compose | Host (`make run-dev`) |
+|---|---|---|
+| S3 Endpoint | `http://rustfs:9000` | `http://localhost:9000` |
+| Access Key ID | `labelstudio` | `labelstudio` |
+| Secret Access Key | `labelstudio` | `labelstudio` |
+| Bucket Name | `labelstudio` | `labelstudio` |
+| Region Name | `us-east-1` | `us-east-1` |
+
+If pre-signed URLs fail in the browser, turn that toggle off so Label Studio proxies the files.
+
+The console is at http://localhost:9001 (or http://rustfs:9001 after the hosts entry).
+
+### Remove RustFS data
+This removes the RustFS containers and volumes. It deletes all objects stored in RustFS.
+
+```bash
+docker compose -f docker-compose.rustfs.yml down --volumes
 ```
 
 

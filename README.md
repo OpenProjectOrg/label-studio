@@ -110,17 +110,13 @@ Then in Label Studio go to **Settings → Cloud Storage → Amazon S3**:
 
 If pre-signed URLs fail in the browser, turn that toggle off so Label Studio proxies the files.
 
-#### Dev Container
-Reopen the repo in a Dev Container (`Dev Containers: Reopen in Container`). This uses a Python 3.13 image (it does **not** build the production Dockerfile). RustFS on the host at `:9000` is reachable as `http://rustfs:9000`. After the container is up, build the frontend once (needs [Bun](https://bun.sh) on the host or in the container), then start Django:
+When you run Label Studio on the host (`make run-dev`) instead of Docker, start only RustFS:
 
 ```bash
-make frontend-build
-make migrate-dev
-make run-dev
+docker compose -f docker-compose.rustfs.yml up -d
 ```
 
-Then open http://localhost:8080. Frontend HMR is still run on the host with `make frontend-dev`.
-
+Use S3 Endpoint `http://localhost:9000` (no hosts file needed). Same key, secret, bucket, and region as above.
 
 ### Install locally with pip
 
@@ -161,18 +157,29 @@ pip install label-studio
 
 ### Install for local development
 
-You can run the latest Label Studio version locally without installing the package from pypi. 
+Local development follows the repo Makefile: `uv` for Python, [Bun](https://bun.sh) for the frontend, SQLite, `DEBUG=true`.
 
 ```bash
-# Install all package dependencies
-pip install poetry
-poetry install
-# Run database migrations
-python label_studio/manage.py migrate
-python label_studio/manage.py collectstatic
-# Start the server in development mode at http://localhost:8080
-python label_studio/manage.py runserver
+# Python deps
+uv sync
+
+# Frontend (once, or after UI changes)
+make frontend-build
+
+# Copy hashed assets + manifest into Django STATIC_ROOT
+DJANGO_DB=sqlite DJANGO_SETTINGS_MODULE=core.settings.label_studio uv run python label_studio/manage.py collectstatic --no-input
+
+# Optional local S3
+docker compose -f docker-compose.rustfs.yml up -d
+
+# Migrations + Django — http://localhost:8080
+make migrate-dev
+make run-dev
 ```
+
+Hot-reload the UI with `make frontend-dev` and `FRONTEND_HMR=true make run-dev`.
+
+For Docker-based HMR instead, see `make docker-dev-setup` / `make docker-run-dev` in the Makefile.
 
 ### Deploy in a cloud instance
 
