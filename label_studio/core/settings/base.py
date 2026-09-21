@@ -926,6 +926,7 @@ if get_env('MINIO_STORAGE_ENDPOINT') and not get_bool_env('MINIO_SKIP', False):
     AWS_ACCESS_KEY_ID = get_env('MINIO_STORAGE_ACCESS_KEY')
     AWS_SECRET_ACCESS_KEY = get_env('MINIO_STORAGE_SECRET_KEY')
     AWS_S3_ENDPOINT_URL = get_env('MINIO_STORAGE_ENDPOINT')
+    AWS_S3_ADDRESSING_STYLE = 'path'
     AWS_QUERYSTRING_AUTH = False
     # make domain for FileUpload.file
     AWS_S3_SECURE_URLS = False
@@ -942,6 +943,8 @@ if get_env('STORAGE_TYPE') == 's3':
     AWS_STORAGE_BUCKET_NAME = get_env('STORAGE_AWS_BUCKET_NAME')
     AWS_S3_REGION_NAME = get_env('STORAGE_AWS_REGION_NAME', None)
     AWS_S3_ENDPOINT_URL = get_env('STORAGE_AWS_ENDPOINT_URL', None)
+    if AWS_S3_ENDPOINT_URL:
+        AWS_S3_ADDRESSING_STYLE = 'path'
     if get_env('STORAGE_AWS_OBJECT_PARAMETERS'):
         AWS_S3_OBJECT_PARAMETERS = json.loads(get_env('STORAGE_AWS_OBJECT_PARAMETERS'))
     AWS_QUERYSTRING_EXPIRE = int(get_env('STORAGE_AWS_X_AMZ_EXPIRES', '86400'))
@@ -989,6 +992,8 @@ S3_TRUSTED_STORAGE_DOMAINS = get_env_list(
         'oracle.com',
         'amazon.com',
         'appdomain.cloud',
+        'localhost',
+        'rustfs',
     ],
 )
 

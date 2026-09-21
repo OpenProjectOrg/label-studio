@@ -27,6 +27,7 @@ Install Label Studio locally or deploy it in a cloud instance. [Or sign up for a
 
 - [Install locally with Docker](#install-locally-with-docker)
 - [Run with Docker Compose (Label Studio + Nginx + PostgreSQL)](#run-with-docker-compose)
+- [Run with Docker Compose + RustFS](#run-with-docker-compose--rustfs)
 - [Install locally with pip](#install-locally-with-pip)
 - [Install locally with poetry](#install-locally-with-poetry)
 - [Install locally with Anaconda](#install-locally-with-anaconda)
@@ -68,15 +69,57 @@ To start using the app from `http://localhost` run this command:
 docker-compose up
 ```
 
-### Run with Docker Compose + MinIO
-You can also run it with an additional MinIO server for local S3 storage. This is particularly useful when you want to 
-test the behavior with S3 storage on your local system. To start Label Studio in this way, you need to run the following command:
-````bash
+### Run with Docker Compose + RustFS
+RustFS is an Apache-2.0 S3-compatible object store used here instead of MinIO. Start it alongside Label Studio to test S3 import/export locally:
+
+```bash
 # Add sudo on Linux if you are not a member of the docker group
-docker compose -f docker-compose.yml -f docker-compose.minio.yml up -d
-````
-If you do not have a static IP address, you must create an entry in your hosts file so that both Label Studio and your 
-browser can access the MinIO server. For more detailed instructions, please refer to [our guide on storing data](docs/source/guide/storedata.md).
+docker compose -f docker-compose.yml -f docker-compose.rustfs.yml up -d
+```
+
+Do not start this overlay together with `docker-compose.minio.yml` — both bind port 9000.
+
+Default credentials (override with `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY`):
+
+| | Value |
+|---|---|
+| Access key | `labelstudio` |
+| Secret key | `labelstudio` |
+| S3 API | http://localhost:9000 |
+| Console | http://localhost:9001 |
+
+Create a bucket named `labelstudio` in the console (or with any S3 client) before connecting Label Studio.
+
+Add this hosts entry so the Label Studio container and your browser share the same hostname. This is required for pre-signed URLs:
+
+```text
+127.0.0.1 rustfs
+```
+
+On Linux: `/etc/hosts`. On macOS: `/private/etc/hosts`. On Windows: `C:\Windows\System32\drivers\etc\hosts`.
+
+Then in Label Studio go to **Settings → Cloud Storage → Amazon S3**:
+
+| Field | Value |
+|---|---|
+| S3 Endpoint | `http://rustfs:9000` |
+| Access Key ID | `labelstudio` |
+| Secret Access Key | `labelstudio` |
+| Bucket Name | `labelstudio` |
+| Region Name | `us-east-1` |
+
+If pre-signed URLs fail in the browser, turn that toggle off so Label Studio proxies the files.
+
+#### Dev Container
+Reopen the repo in a Dev Container (`Dev Containers: Reopen in Container`). This uses a Python 3.13 image (it does **not** build the production Dockerfile). RustFS on the host at `:9000` is reachable as `http://rustfs:9000`. After the container is up, build the frontend once (needs [Bun](https://bun.sh) on the host or in the container), then start Django:
+
+```bash
+make frontend-build
+make migrate-dev
+make run-dev
+```
+
+Then open http://localhost:8080. Frontend HMR is still run on the host with `make frontend-dev`.
 
 
 ### Install locally with pip

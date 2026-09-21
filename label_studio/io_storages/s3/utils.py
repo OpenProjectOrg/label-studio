@@ -35,10 +35,15 @@ def get_client_and_resource(
     )
     settings = {'region_name': region_name or get_env('S3_region') or 'us-east-1'}
     s3_endpoint = s3_endpoint or get_env('S3_ENDPOINT')
+    client_config = {'signature_version': 's3v4'}
     if s3_endpoint:
         settings['endpoint_url'] = s3_endpoint
-    client = session.client('s3', config=boto3.session.Config(signature_version='s3v4'), **settings)
-    resource = session.resource('s3', config=boto3.session.Config(signature_version='s3v4'), **settings)
+        # Path-style is required for S3-compatible stores (RustFS, MinIO, …).
+        # Virtual-hosted requests become http://bucket.host/ and fail DNS.
+        client_config['s3'] = {'addressing_style': 'path'}
+    config = boto3.session.Config(**client_config)
+    client = session.client('s3', config=config, **settings)
+    resource = session.resource('s3', config=config, **settings)
     return client, resource
 
 
@@ -166,9 +171,11 @@ def catch_and_reraise_from_none(func):
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
-            if self.s3_endpoint and (
-                domain := extractor.extract_urllib(urlparse(self.s3_endpoint)).registered_domain.lower()
-            ) not in [trusted_domain.lower() for trusted_domain in settings.S3_TRUSTED_STORAGE_DOMAINS]:
+            extracted = extractor.extract_urllib(urlparse(self.s3_endpoint)) if self.s3_endpoint else None
+            # Single-label hosts (rustfs, localhost) have no registered_domain.
+            domain = ((extracted.registered_domain or extracted.domain) if extracted else '').lower()
+            trusted = [d.lower() for d in settings.S3_TRUSTED_STORAGE_DOMAINS]
+            if self.s3_endpoint and domain and domain not in trusted:
                 logger.error(f'Exception from unrecognized S3 domain: {e}', exc_info=True)
                 raise S3StorageError(
                     f'Debugging info is not available for s3 endpoints on domain: {domain}. '

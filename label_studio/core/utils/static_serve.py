@@ -66,6 +66,9 @@ def serve(request, path, document_root=None, show_indexes=False, manifest_asset_
         )
         if possible_asset.startswith(manifest_asset_prefix):
             possible_asset = possible_asset[len(manifest_asset_prefix) :]
+        # Manifest values are URL paths ("/react-app/main.js"). After stripping
+        # the prefix a leading slash remains; safe_join treats that as absolute.
+        possible_asset = possible_asset.lstrip('/')
         fullpath = Path(safe_join(document_root, possible_asset))
     if not fullpath.exists():
         raise Http404(_('“%(path)s” does not exist') % {'path': fullpath})

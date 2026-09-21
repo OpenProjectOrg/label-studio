@@ -1,4 +1,35 @@
-from core.utils.static_serve import static_file_content_type_and_encoding
+import pytest
+from core.utils.static_serve import serve, static_file_content_type_and_encoding
+from django.http import Http404
+
+
+class TestServeManifestFallback:
+    def test_manifest_url_path_is_not_treated_as_absolute(self, tmp_path, monkeypatch, rf):
+        """get_manifest_asset returns '/react-app/main.js' when HOST is empty."""
+        monkeypatch.setattr('core.utils.static_serve.get_manifest_asset', lambda _path: '/react-app/main.js')
+        request = rf.get('/react-app/main.js')
+
+        with pytest.raises(Http404):
+            serve(
+                request,
+                'main.js',
+                document_root=str(tmp_path),
+                manifest_asset_prefix='react-app',
+            )
+
+    def test_manifest_url_path_serves_file_inside_document_root(self, tmp_path, monkeypatch, rf):
+        (tmp_path / 'main.js').write_text('ok')
+        monkeypatch.setattr('core.utils.static_serve.get_manifest_asset', lambda _path: '/react-app/main.js')
+        request = rf.get('/react-app/missing.js')
+
+        response = serve(
+            request,
+            'missing.js',
+            document_root=str(tmp_path),
+            manifest_asset_prefix='react-app',
+        )
+
+        assert response.status_code == 200
 
 
 class TestStaticFileContentType:
